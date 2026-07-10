@@ -18,7 +18,7 @@ class Settings(BaseSettings):
 
     # External APIs
     GEMINI_API_KEY: Optional[str] = None
-    GOOGLE_GEOCODING_API_KEY: Optional[str] = None
+    MAPBOX_API_KEY: Optional[str] = None
 
     # Security & Mocks for Local Testing
     MOCK_AUTH_ENABLED: bool = True

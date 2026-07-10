@@ -73,7 +73,7 @@ FIREBASE_CREDENTIALS_PATH=firebase-credentials.json
 
 # External Service Integrations
 GEMINI_API_KEY=your-gemini-api-key
-GOOGLE_GEOCODING_API_KEY=your-google-geocoding-api-key
+MAPBOX_API_KEY=your-mapbox-api-key
 
 # Local Testing Mock Mode
 MOCK_AUTH_ENABLED=true
