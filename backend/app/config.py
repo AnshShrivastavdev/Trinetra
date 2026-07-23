@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     # External APIs
     GEMINI_API_KEY: Optional[str] = None
     MAPBOX_API_KEY: Optional[str] = None
+    CLOUDINARY_CLOUD_NAME: Optional[str] = None
+    CLOUDINARY_API_KEY: Optional[str] = None
+    CLOUDINARY_API_SECRET: Optional[str] = None
 
     # Security & Mocks for Local Testing
     MOCK_AUTH_ENABLED: bool = True

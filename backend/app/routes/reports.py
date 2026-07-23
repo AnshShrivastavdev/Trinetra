@@ -4,6 +4,8 @@ from datetime import datetime
 from bson import ObjectId
 from bson.errors import InvalidId
 from typing import Optional, List
+from fastapi import UploadFile, File
+from app.utils.cloudinary_client import upload_image,upload_video
 
 from app.db import db
 from app.firebase import get_current_user, RequireRole
@@ -370,3 +372,35 @@ async def verify_report_ai(
     )
 
     return ai_analysis
+@router.post("/upload-image")
+async def upload_report_media(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(RequireRole(allowed_roles=["citizen", "authority", "admin"]))
+):
+    """
+    Uploads a single image or video to Cloudinary for use in a report's mediaUrls.
+    Detects file type automatically and routes to the correct Cloudinary uploader.
+    Returns the hosted media URL to be included when creating/updating a report.
+    """
+    content_type = file.content_type or ""
+
+    try:
+        if content_type.startswith("video/"):
+            result = upload_video(file.file, folder="trinetra/reports")
+        elif content_type.startswith("image/"):
+            result = upload_image(file.file, folder="trinetra/reports")
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unsupported file type: {content_type}. Only images and videos are allowed."
+            )
+
+        return {"url": result["url"], "public_id": result["public_id"], "type": "video" if content_type.startswith("video/") else "image"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Media upload failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to upload media to Cloudinary."
+        )
