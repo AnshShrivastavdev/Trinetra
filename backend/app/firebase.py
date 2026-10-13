@@ -11,14 +11,22 @@ logger = logging.getLogger(__name__)
 # Initialize Firebase Admin SDK if credentials exist
 firebase_initialized = False
 
-if settings.FIREBASE_CREDENTIALS_PATH and os.path.exists(settings.FIREBASE_CREDENTIALS_PATH):
+cred_path = settings.FIREBASE_CREDENTIALS_PATH
+if cred_path and not os.path.isabs(cred_path):
+    backend_dir = os.path.dirname(os.path.dirname(__file__))
+    candidate = os.path.join(backend_dir, cred_path)
+    if os.path.exists(candidate):
+        cred_path = candidate
+
+if cred_path and os.path.exists(cred_path):
     try:
         import firebase_admin
         from firebase_admin import credentials, auth
-        cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS_PATH)
-        firebase_admin.initialize_app(cred)
+        if not firebase_admin._apps:
+            cred = credentials.Certificate(cred_path)
+            firebase_admin.initialize_app(cred)
         firebase_initialized = True
-        logger.info("Firebase Admin SDK successfully initialized.")
+        logger.info(f"Firebase Admin SDK successfully initialized from {cred_path}.")
     except Exception as e:
         logger.error(f"Error initializing Firebase Admin SDK: {e}")
 else:
