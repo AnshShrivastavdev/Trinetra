@@ -5,7 +5,9 @@ from pydantic.functional_validators import BeforeValidator
 
 PyObjectId = Annotated[str, BeforeValidator(str)]
 
-ReportStatus = Literal["Pending", "Ongoing", "Resolved"]
+ReportStatus = Literal[
+    "Pending", "Reported", "FIR Filed", "Ongoing", "Investigating", "Charge-sheet Submitted", "Resolved", "Closed"
+]
 
 class LocationSchema(BaseModel):
     lat: float
@@ -21,7 +23,10 @@ class ReportCreate(BaseModel):
     description: str
     emergencyFlag: bool = False
     anonymityFlag: bool = False
+    whistleblowerMode: bool = False
     mediaUrls: List[str] = Field(default_factory=list)
+    evidenceLedger: List[dict] = Field(default_factory=list)
+    assignedDepartment: Optional[str] = None
     location: LocationSchema
 
 class ReportResponse(BaseModel):
@@ -30,7 +35,14 @@ class ReportResponse(BaseModel):
     description: str
     emergencyFlag: bool
     anonymityFlag: bool
-    mediaUrls: List[str]
+    whistleblowerMode: bool = False
+    whistleblowerToken: Optional[str] = None
+    mediaUrls: List[str] = Field(default_factory=list)
+    evidenceLedger: List[dict] = Field(default_factory=list)
+    auditTrail: List[dict] = Field(default_factory=list)
+    firNumber: Optional[str] = None
+    firDetails: Optional[dict] = None
+    assignedDepartment: Optional[str] = None
     location: LocationSchema
     status: ReportStatus
     voteCount: int = 0
@@ -49,13 +61,18 @@ class ReportResponse(BaseModel):
                 "description": "Stolen bicycle near the park entry.",
                 "emergencyFlag": False,
                 "anonymityFlag": True,
+                "whistleblowerMode": False,
                 "mediaUrls": ["https://cloudinary.com/example.jpg"],
+                "evidenceLedger": [],
+                "auditTrail": [],
+                "firNumber": "FIR-2026-1013-A8F2",
+                "assignedDepartment": "Local Police",
                 "location": {
                     "lat": 12.9716,
                     "lng": 77.5946,
                     "address": "Cubbon Park, Bangalore"
                 },
-                "status": "Pending",
+                "status": "FIR Filed",
                 "voteCount": 5,
                 "isFlagged": False,
                 "createdBy": "anonymous",

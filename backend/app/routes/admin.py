@@ -6,7 +6,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import Literal
 from bson import ObjectId
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.db import db
 from app.firebase import RequireRole
@@ -98,7 +98,7 @@ async def review_flagged_report(
         # Clear flagged state
         updated_report = await db.reports.find_one_and_update(
             {"_id": report_oid},
-            {"$set": {"isFlagged": False, "updatedAt": datetime.utcnow()}},
+            {"$set": {"isFlagged": False, "updatedAt": datetime.now(timezone.utc)}},
             return_document=True
         )
         logger.info(f"Admin restored flagged report: {id}")
@@ -265,4 +265,51 @@ async def remove_user(
     return {
         "status": "success",
         "message": "User and associated voting records permanently deleted."
+    }
+
+class AssignRolePayload(BaseModel):
+    role: Literal["citizen", "authority", "admin"]
+
+@router.get("/users")
+async def list_all_users(
+    admin_user: dict = Depends(RequireRole(allowed_roles=["admin"]))
+):
+    """
+    Admin-only endpoint to list all registered users from the database.
+    """
+    cursor = db.users.find({}, {"_id": 0})
+    users = await cursor.to_list(length=500)
+    return users
+
+@router.post("/users/{firebase_uid}/assign-role")
+async def assign_user_role(
+    firebase_uid: str,
+    payload: AssignRolePayload,
+    admin_user: dict = Depends(RequireRole(allowed_roles=["admin"]))
+):
+    """
+    Admin-only endpoint to promote/assign authority or citizen role to any user.
+    """
+    user = await db.users.find_one({"firebase_uid": firebase_uid})
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found with specified UID."
+        )
+
+    new_role = payload.role
+    # Auto-approve authority profiles when explicitly assigned by admin
+    is_approved = True
+
+    await db.users.update_one(
+        {"firebase_uid": firebase_uid},
+        {"$set": {"role": new_role, "is_approved": is_approved, "updatedAt": datetime.now(timezone.utc)}}
+    )
+
+    logger.info(f"Admin updated role for user {firebase_uid} to {new_role}")
+    return {
+        "status": "success",
+        "message": f"User role updated to {new_role}.",
+        "role": new_role,
+        "is_approved": is_approved
     }

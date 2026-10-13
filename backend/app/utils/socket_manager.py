@@ -30,9 +30,10 @@ async def connect(sid, environ, auth=None):
     # Verify token
     try:
         if settings.MOCK_AUTH_ENABLED and token.startswith("mock_token_"):
-            parts = token.split("_")
-            role = parts[2] if len(parts) > 2 else "citizen"
-            uid = parts[3] if len(parts) > 3 else "mock_user_123"
+            remainder = token[len("mock_token_"):]
+            parts = remainder.split("_", 2)
+            role = parts[0] if len(parts) > 0 and parts[0] else "citizen"
+            uid = parts[1] if len(parts) > 1 and parts[1] else "mock_user_123"
         else:
             # Import firebase admin dynamically to verify token
             from firebase_admin import auth as firebase_auth

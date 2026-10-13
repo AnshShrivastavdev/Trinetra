@@ -1,0 +1,72 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Instrument+Serif:ital@0;1&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-primary-bg: #050508;
+  --color-emerald-emitter: #10B981;
+  --color-amber-emitter: #F59E0B;
+  --font-display: "Instrument Serif", serif;
+  --font-body: "Plus Jakarta Sans", sans-serif;
+}
+
+body {
+  background-color: #050508;
+  color: #E2E8F0;
+  font-family: "Plus Jakarta Sans", sans-serif;
+  overflow-x: hidden;
+  margin: 0;
+  padding: 0;
+}
+
+/* Custom Liquid Glass & Neumorphic Utility classes */
+.liquid-glass {
+  background: rgba(10, 10, 15, 0.4);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 
+    0 25px 50px -12px rgba(0, 0, 0, 0.85),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.08),
+    inset 0 -1px 0 0 rgba(255, 255, 255, 0.02);
+}
+
+.liquid-glass-glow-amber {
+  box-shadow: 
+    0 0 20px rgba(245, 158, 11, 0.15),
+    0 25px 50px -12px rgba(0, 0, 0, 0.85),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.08),
+    inset 0 -1px 0 0 rgba(255, 255, 255, 0.02);
+  border-color: rgba(245, 158, 11, 0.25);
+}
+
+.liquid-glass-glow-emerald {
+  box-shadow: 
+    0 0 20px rgba(16, 185, 129, 0.15),
+    0 25px 50px -12px rgba(0, 0, 0, 0.85),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.08),
+    inset 0 -1px 0 0 rgba(255, 255, 255, 0.02);
+  border-color: rgba(16, 185, 129, 0.25);
+}
+
+.liquid-glass-hover {
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.liquid-glass-hover:hover {
+  background: rgba(15, 15, 22, 0.55);
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: 
+    0 30px 60px -15px rgba(0, 0, 0, 0.9),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.18),
+    inset 0 -1px 0 0 rgba(255, 255, 255, 0.03);
+  transform: translateY(-2px);
+}
+
+/* Hide scrollbar but keep functionality */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

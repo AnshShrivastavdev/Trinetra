@@ -5,9 +5,15 @@ __pycache__/
 
 # Environment Variables & Secrets (CRITICAL)
 .env
+*.env
 .env.*
 !.env.example
 firebase-credentials.json
+*firebase-credentials*.json
+*.pem
+*.key
+*.p12
+
 
 # Testing & Cache
 .pytest_cache/
@@ -27,6 +33,15 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+
+# Node & Frontend Build
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Temporary Frame Archive (frames are in frontend/public/frames)
+ezgif-592624f3934cca6e-jpg/
 
 # Editor & System Files
 .vscode/

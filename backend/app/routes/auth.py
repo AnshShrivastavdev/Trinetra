@@ -1,9 +1,10 @@
 import logging
 from fastapi import APIRouter, Depends, HTTPException, status
-from datetime import datetime
+from datetime import datetime, timezone
 from app.db import db
 from app.firebase import get_current_user, RequireRole
 from app.models.user import UserResponse, UserRole
+from app.utils.otp_service import dispatch_otp
 
 logger = logging.getLogger(__name__)
 
@@ -14,10 +15,26 @@ class SyncPayload(UserResponse.__annotations__.get("role", None) or object):
     pass
 
 from pydantic import BaseModel
-from typing import Literal
+from typing import Literal, Optional
+import random
+
+ADMIN_EMAIL = "anshshrivastav9480@gmail.com"
+
 class OnboardRequest(BaseModel):
-    role: Literal["citizen", "authority"]
+    role: Literal["citizen", "authority", "admin"]
     name: str
+
+class SendOtpRequest(BaseModel):
+    identifier: str
+    role: Literal["citizen", "authority", "admin"] = "citizen"
+
+class VerifyOtpRequest(BaseModel):
+    identifier: str
+    otp_code: str
+    name: Optional[str] = None
+    role: Literal["citizen", "authority", "admin"] = "citizen"
+
+
 
 @router.post("/sync", response_model=UserResponse)
 async def sync_user(
@@ -42,11 +59,15 @@ async def sync_user(
     user_in_db = await db.users.find_one({"firebase_uid": uid})
 
     if user_in_db:
-        # If user exists, update their profile fields (name, but not role once onboarded)
+        # If user exists, update their profile fields (and role if superuser testing email)
         update_data = {
             "name": payload.name,
             "email": email,
         }
+        if email.lower() == ADMIN_EMAIL.lower():
+            update_data["role"] = payload.role
+            update_data["is_approved"] = True
+
         await db.users.update_one(
             {"firebase_uid": uid},
             {"$set": update_data}
@@ -58,9 +79,11 @@ async def sync_user(
     # Create new user record
     role = payload.role
     
-    # Validation logic: Citizens auto-approve. Authorities start unapproved. Admins are auto-approved.
+    # Validation logic: Citizens auto-approve. Authorities start unapproved. Admins & Superuser are auto-approved.
     is_approved = True
-    if role == "authority":
+    if email.lower() == ADMIN_EMAIL.lower():
+        is_approved = True
+    elif role == "authority":
         is_approved = False
     elif role == "admin":
         is_approved = True
@@ -72,7 +95,7 @@ async def sync_user(
         "role": role,
         "is_approved": is_approved,
         "is_active": True,
-        "createdAt": datetime.utcnow()
+        "createdAt": datetime.now(timezone.utc)
     }
 
     try:
@@ -137,10 +160,120 @@ async def approve_authority(
         "type": "admin_notification",
         "referenceId": None,
         "isRead": False,
-        "createdAt": datetime.utcnow()
+        "createdAt": datetime.now(timezone.utc)
     }
     await db.notifications.insert_one(notification)
 
     # Return updated user
     updated_user = await db.users.find_one({"firebase_uid": firebase_uid})
     return updated_user
+
+
+@router.post("/send-otp")
+async def send_otp(payload: SendOtpRequest):
+    """
+    Generates a 6-digit OTP code for a phone number or email identifier.
+    Saves OTP record into MongoDB with automatic expiry.
+    """
+    clean_id = payload.identifier.strip().lower()
+    if not clean_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Mobile phone number or email identifier is required."
+        )
+
+    # Restrict Admin Role strictly to designated admin email
+    if payload.role == "admin" and clean_id != ADMIN_EMAIL.lower():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Unauthorized: Only designated Admin credentials can access the Admin control unit."
+        )
+
+    # Generate 6-digit code
+    otp_code = f"{random.randint(100000, 999999)}"
+    
+    otp_record = {
+        "identifier": clean_id,
+        "otp_code": otp_code,
+        "role": payload.role,
+        "createdAt": datetime.now(timezone.utc)
+    }
+
+    # Store or update OTP record in DB
+    await db.db.otps.delete_many({"identifier": clean_id})
+    await db.db.otps.insert_one(otp_record)
+    
+    logger.info(f"Generated OTP [{otp_code}] for identifier {clean_id}")
+
+    # Dispatch real OTP via Email or SMS
+    dispatch_res = await dispatch_otp(clean_id, otp_code)
+
+    return {
+        "status": "success",
+        "message": dispatch_res.get("message") or f"Verification OTP code sent to {payload.identifier}"
+    }
+
+
+@router.post("/verify-otp")
+async def verify_otp(payload: VerifyOtpRequest):
+    """
+    Verifies 6-digit OTP code against stored records.
+    Upon verification, logs in or registers user profile and returns access credentials.
+    """
+    clean_id = payload.identifier.strip().lower()
+    clean_otp = payload.otp_code.strip()
+
+    otp_doc = await db.db.otps.find_one({"identifier": clean_id, "otp_code": clean_otp})
+    if not otp_doc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired OTP verification code."
+        )
+
+    # Delete used OTP
+    await db.db.otps.delete_one({"_id": otp_doc["_id"]})
+
+    # Derive UID and Email
+    uid = f"otpuser{abs(hash(clean_id)) % 10000000}"
+    email = clean_id if "@" in clean_id else f"{clean_id}@phone.trinetra"
+    user_name = payload.name or f"User {clean_id[-4:] if len(clean_id) >= 4 else clean_id}"
+    role = payload.role
+
+    # Upsert user record
+    existing_user = await db.users.find_one({"firebase_uid": uid})
+    if not existing_user:
+        is_approved = True if role in ["citizen", "admin"] or clean_id.lower() == ADMIN_EMAIL.lower() else False
+        new_user = {
+            "firebase_uid": uid,
+            "email": email,
+            "name": user_name,
+            "role": role,
+            "is_approved": is_approved,
+            "is_active": True,
+            "createdAt": datetime.now(timezone.utc)
+        }
+        await db.users.insert_one(new_user)
+        user_data = new_user
+    else:
+        if clean_id.lower() == ADMIN_EMAIL.lower():
+            await db.users.update_one({"firebase_uid": uid}, {"$set": {"role": role, "is_approved": True}})
+            existing_user["role"] = role
+            existing_user["is_approved"] = True
+        user_data = existing_user
+
+    # Generate token format
+    token = f"mock_token_{role}_{uid}_{email}"
+
+    return {
+        "status": "success",
+        "message": "OTP verification successful.",
+        "token": token,
+        "user": {
+            "firebase_uid": uid,
+            "email": email,
+            "name": user_data.get("name"),
+            "role": role,
+            "is_approved": user_data.get("is_approved", True)
+        }
+    }
+
